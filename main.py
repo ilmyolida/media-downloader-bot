@@ -15,58 +15,36 @@ YT_CHANNEL_URL = "https://youtube.com/@islamicummah571?si=cdnypvM7njA3knKB"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
 
-# Xotira va ma'lumotlar bazasi
-user_langs = {}      # user_id -> lang
-verified_users = set() # Bir marta obuna bo'lgan foydalanuvchilar IDsi
-click_timers = {}    # user_id -> time
-user_links = {}      # user_id -> link
-users_db = set()     # Unikal foydalanuvchilar
+# Xotira
+user_langs = {}
+verified_users = set()
+click_timers = {}
+user_links = {}
+user_formats = {} # Har bir foydalanuvchining video sifatlari ro'yxati
+users_db = set()
 
-# --- MULTI-LANGUAGE DICTIONARY ---
+# --- MULTI-LANGUAGE ---
 TEXTS = {
     'uz': {
-        'welcome': "👋 **Xush kelibsiz!**\n\nMen **YouTube, Instagram, TikTok va Facebook**-dan video va audiolarni yuqori sifatda yuklab beraman.\n\nMenga shunchaki media havolasini (link) yuboring!",
-        'select_lang': "🌐 **Iltimos, muloqot tilini tanlang / Пожалуйста, выберите язык:**",
+        'welcome': "👋 **Xush kelibsiz!**\n\nMen **YouTube, Instagram, TikTok va Facebook**-dan video va audiolarni yuqori sifatda yuklab beruvchi mukammal botman.\n\nMenga video havolasini (link) yuboring!",
+        'select_lang': "🌐 **Iltimos, muloqot tilini tanlang:**",
         'lang_changed': "✅ **Til o'zgartirildi!**",
         'sub_required': "⚠️ **Botdan foydalanish uchun bir marta kanallarimizga obuna bo'ling!**\n\nA'zo bo'lgach, **Obunani Tasdiqlash** tugmasini bosing.",
         'btn_tg': "1️⃣ Telegram Kanal",
         'btn_yt': "2️⃣ YouTube Kanal",
         'btn_verify': "✅ Obunani Tasdiqlash",
         'timer_wait': "⏳ Obuna bo'lish uchun kanallarga o'ting va kamida 4 soniya kuting!",
-        'select_format': "🎬 **Formatni tanlang:**\nNima shaklida yuklab olishni xohlaysiz?",
-        'btn_mp4': "📹 Video (MP4)",
-        'btn_mp3': "🎵 Audio (MP3)",
+        'checking_link': "🔍 **Video ma'lumotlari va sifatlari yuklanmoqda...**\nIltimos, kuting.",
+        'select_quality': "🎬 **Video sifatini yoki formatni tanlang:**",
         'downloading': "🔄 **Media yuklanmoqda...**\nIltimos, biroz kuting.",
         'sending': "🚀 **Fayl yuborilmoqda...**",
         'success': "✨ **Muvaffaqiyatli yuklab berildi!**\n\n🕊 @oqivaqotaril loyihasi.",
         'error_link': "❌ Iltimos, faqat to'g'ri YouTube, Instagram, TikTok yoki Facebook havolasini yuboring!",
-        'error_download': "❌ **Xatolik:** Video o'lchami o'ta katta (50MB dan ortiq) yoki havola yopiq profildan.",
+        'error_download': "❌ **Xatolik:** Video yuklab bo'lmadi (Hajmi 50MB dan katta bo'lishi yoki havola yopiq profildan bo'lishi mumkin).",
         'stats': "📊 **Bot Statistikasi:**\n\n👥 Jami foydalanuvchilar: **{}** ta",
         'btn_menu_lang': "🌐 Tilni o'zgartirish",
         'btn_menu_stats': "📊 Statistika",
         'btn_menu_help': "ℹ️ Yordam"
-    },
-    'ru': {
-        'welcome': "👋 **Добро пожаловать!**\n\nЯ скачиваю видео и аудио с **YouTube, Instagram, TikTok и Facebook** в высоком качестве.\n\nПросто отправьте мне ссылку!",
-        'select_lang': "🌐 **Пожалуйста, выберите язык:**",
-        'lang_changed': "✅ **Язык успешно изменен!**",
-        'sub_required': "⚠️ **Подпишитесь на наши каналы один раз для доступа к боту!**",
-        'btn_tg': "1️⃣ Telegram Канал",
-        'btn_yt': "2️⃣ YouTube Канал",
-        'btn_verify': "✅ Проверить подписку",
-        'timer_wait': "⏳ Перейдите на каналы и подождите не менее 4 секунд!",
-        'select_format': "🎬 **Выберите формат:**\nВ каком формате вы хотите скачать?",
-        'btn_mp4': "📹 Видео (MP4)",
-        'btn_mp3': "🎵 Аудио (MP3)",
-        'downloading': "🔄 **Медиа скачивается...**\nПожалуйста, подождите.",
-        'sending': "🚀 **Отправка файла...**",
-        'success': "✨ **Успешно загружено!**\n\n🕊 Проект @oqivaqotaril.",
-        'error_link': "❌ Отправьте корректную ссылку на YouTube, Instagram, TikTok или Facebook!",
-        'error_download': "❌ **Ошибка:** Файл слишком большой (более 50 МБ) или ссылка недоступна.",
-        'stats': "📊 **Статистика бота:**\n\n👥 Всего пользователей: **{}**",
-        'btn_menu_lang': "🌐 Сменить язык",
-        'btn_menu_stats': "📊 Статистика",
-        'btn_menu_help': "ℹ️ Помощь"
     }
 }
 
@@ -76,26 +54,19 @@ def get_txt(user_id, key):
 
 def main_menu_keyboard(user_id):
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    lang_btn = KeyboardButton(get_txt(user_id, 'btn_menu_lang'))
-    stats_btn = KeyboardButton(get_txt(user_id, 'btn_menu_stats'))
-    help_btn = KeyboardButton(get_txt(user_id, 'btn_menu_help'))
-    markup.row(lang_btn, stats_btn)
-    markup.row(help_btn)
+    markup.row(KeyboardButton(get_txt(user_id, 'btn_menu_lang')), KeyboardButton(get_txt(user_id, 'btn_menu_stats')))
+    markup.row(KeyboardButton(get_txt(user_id, 'btn_menu_help')))
     return markup
 
 def language_inline_keyboard():
     markup = InlineKeyboardMarkup()
-    markup.add(
-        InlineKeyboardButton("🇺🇿 O'zbekcha", callback_data="setlang_uz"),
-        InlineKeyboardButton("🇷🇺 Русский", callback_data="setlang_ru")
-    )
+    markup.add(InlineKeyboardButton("🇺🇿 O'zbekcha", callback_data="setlang_uz"))
     return markup
 
 @bot.message_handler(commands=['start', 'lang'])
 def start_handler(message):
     user_id = message.from_user.id
     users_db.add(user_id)
-    
     if str(user_id) not in user_langs:
         bot.reply_to(message, TEXTS['uz']['select_lang'], reply_markup=language_inline_keyboard())
     else:
@@ -104,17 +75,14 @@ def start_handler(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("setlang_"))
 def set_language_callback(call):
     user_id = call.from_user.id
-    lang_code = call.data.replace("setlang_", "")
-    user_langs[str(user_id)] = lang_code
-    
+    user_langs[str(user_id)] = call.data.replace("setlang_", "")
     bot.answer_callback_query(call.id, get_txt(user_id, 'lang_changed'))
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
-    except Exception:
-        pass
+    except: pass
     bot.send_message(call.message.chat.id, get_txt(user_id, 'welcome'), reply_markup=main_menu_keyboard(user_id))
 
-# --- OBUNA TASDIQLASH (BIR MARTA) ---
+# --- OBUNA TEKSHIRUVI (BIR MARTALIK) ---
 @bot.callback_query_handler(func=lambda call: call.data == "verify_sub")
 def verify_callback(call):
     user_id = call.from_user.id
@@ -127,45 +95,54 @@ def verify_callback(call):
         bot.answer_callback_query(call.id, get_txt(user_id, 'timer_wait'), show_alert=True)
         return
 
-    # Foydalanuvchini doimiy ruxsat berilganlar ro'yxatiga qo'shamiz
     verified_users.add(user_id)
-    bot.answer_callback_query(call.id, "✅ Rahmat! Endi bemalol foydalanishingiz mumkin.")
-    
+    bot.answer_callback_query(call.id, "✅ Obuna tasdiqlandi!")
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
-    except Exception:
-        pass
-        
+    except: pass
+    
     if url:
-        show_format_options(call.message.chat.id, user_id)
+        fetch_and_show_formats(call.message.chat.id, user_id, url)
 
-def show_format_options(chat_id, user_id):
-    markup = InlineKeyboardMarkup()
-    markup.add(
-        InlineKeyboardButton(get_txt(user_id, 'btn_mp4'), callback_data="dl_mp4"),
-        InlineKeyboardButton(get_txt(user_id, 'btn_mp3'), callback_data="dl_mp3")
-    )
-    bot.send_message(chat_id, get_txt(user_id, 'select_format'), reply_markup=markup)
+# --- VIDEO SIFATLARINI ANIQLASH VA TUGMA QILISH ---
+def fetch_and_show_formats(chat_id, user_id, url):
+    msg = bot.send_message(chat_id, get_txt(user_id, 'checking_link'))
+    
+    ydl_opts = {'quiet': True, 'no_warnings': True}
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            
+            markup = InlineKeyboardMarkup()
+            # Standart sifat variantlari va Audio
+            markup.add(
+                InlineKeyboardButton("📹 Eng yuqori sifat (HD)", callback_data="dl_best"),
+                InlineKeyboardButton("📹 O'rta sifat (480p/720p)", callback_data="dl_medium")
+            )
+            markup.add(InlineKeyboardButton("🎵 Faqat Audio (MP3)", callback_data="dl_mp3"))
+            
+            bot.delete_message(chat_id, msg.message_id)
+            bot.send_message(chat_id, f"🎬 **{info.get('title', 'Video')}**\n\n{get_txt(user_id, 'select_quality')}", reply_markup=markup)
+    except Exception as e:
+        bot.edit_message_text(get_txt(user_id, 'error_download'), chat_id, msg.message_id)
 
-# --- FORMAT TANLANGANDA (MP4 yoki MP3) ---
-@bot.callback_query_handler(func=lambda call: call.data in ["dl_mp4", "dl_mp3"])
-def download_choice_callback(call):
+# --- SIFAT TANLANGANDA YUKLASH ---
+@bot.callback_query_handler(func=lambda call: call.data.startswith("dl_"))
+def download_selected_format(call):
     user_id = call.from_user.id
     url = user_links.get(str(user_id))
+    fmt_type = call.data.replace("dl_", "")
     
     if not url:
-        bot.answer_callback_query(call.id, "❌ Havola topilmadi, qaytadan yuboring!", show_alert=True)
+        bot.answer_callback_query(call.id, "❌ Havola topilmadi!", show_alert=True)
         return
 
-    is_audio = (call.data == "dl_mp3")
-    bot.answer_callback_query(call.id, "🔄...")
-    
+    bot.answer_callback_query(call.id, "🔄 Yuklash boshlandi...")
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
-    except Exception:
-        pass
-        
-    download_and_send_media(call.message.chat.id, url, user_id, is_audio)
+    except: pass
+    
+    download_and_send(call.message.chat.id, url, user_id, fmt_type)
 
 # --- LINK KELGANDA ---
 @bot.message_handler(func=lambda message: True)
@@ -187,20 +164,18 @@ def message_handler(message):
 
     user_links[str(user_id)] = text
 
-    # Agar foydalanuvchi ilgarigi safar obuna bo'lgan bo'lsa - OBUNA SO'RAMAYDI!
     if user_id in verified_users:
-        show_format_options(message.chat.id, user_id)
+        fetch_and_show_formats(message.chat.id, user_id, text)
     else:
         click_timers[str(user_id)] = time.time()
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton(get_txt(user_id, 'btn_tg'), url=f"https://t.me/{TG_CHANNEL}"))
         markup.add(InlineKeyboardButton(get_txt(user_id, 'btn_yt'), url=YT_CHANNEL_URL))
         markup.add(InlineKeyboardButton(get_txt(user_id, 'btn_verify'), callback_data="verify_sub"))
-        
         bot.reply_to(message, get_txt(user_id, 'sub_required'), reply_markup=markup)
 
-# --- MEDIA YUKLASH TIZIMI ---
-def download_and_send_media(chat_id, url, user_id, is_audio=False):
+# --- YUKLASH FUNKSIYASI ---
+def download_and_send(chat_id, url, user_id, fmt_type):
     status_msg = bot.send_message(chat_id, get_txt(user_id, 'downloading'))
     
     if not os.path.exists("downloads"):
@@ -208,32 +183,42 @@ def download_and_send_media(chat_id, url, user_id, is_audio=False):
         
     out_template = f"downloads/{user_id}_{int(time.time())}.%(ext)s"
     
-    # Optimizatsiyalashgan yt-dlp sozlamasi
-    if is_audio:
+    # Sifatga qarab format tanlash
+    if fmt_type == "mp3":
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': out_template,
+            'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}],
             'max_filesize': 49 * 1024 * 1024,
             'quiet': True
         }
-    else:
+    elif fmt_type == "medium":
         ydl_opts = {
-            'format': 'best[ext=mp4]/bestvideo+bestaudio/best',
+            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best',
             'outtmpl': out_template,
             'max_filesize': 49 * 1024 * 1024,
             'quiet': True
         }
-    
+    else: # best
+        ydl_opts = {
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+            'outtmpl': out_template,
+            'max_filesize': 49 * 1024 * 1024,
+            'quiet': True
+        }
+
     filename = None
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
+            if fmt_type == "mp3" and not filename.endswith(".mp3"):
+                filename = os.path.splitext(filename)[0] + ".mp3"
             
         bot.edit_message_text(get_txt(user_id, 'sending'), chat_id, status_msg.message_id)
         
         with open(filename, 'rb') as file_data:
-            if is_audio:
+            if fmt_type == "mp3":
                 bot.send_audio(chat_id=chat_id, audio=file_data, caption=get_txt(user_id, 'success'))
             else:
                 bot.send_video(chat_id=chat_id, video=file_data, caption=get_txt(user_id, 'success'))
@@ -246,7 +231,7 @@ def download_and_send_media(chat_id, url, user_id, is_audio=False):
         if filename and os.path.exists(filename):
             os.remove(filename)
 
-# --- BOTNI ISHGA TUSHIRISH ---
+# --- ISHGA TUSHIRISH ---
 if __name__ == "__main__":
     def run_dummy_server():
         PORT = int(os.environ.get("PORT", 8080))
@@ -256,6 +241,4 @@ if __name__ == "__main__":
             httpd.serve_forever()
 
     threading.Thread(target=run_dummy_server, daemon=True).start()
-    print("🚀 Professional Bot Tayyor!")
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
-
