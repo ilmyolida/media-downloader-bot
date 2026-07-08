@@ -133,7 +133,25 @@ def download_and_send_video(message, url, user_id):
             os.remove(filename)
 
 # --- BOTNI ISHGA TUSHIRISH ---
+# --- BOTNI ISHGA TUSHIRISH ---
 if __name__ == "__main__":
+    import threading
+    import http.server
+    import socketserver
+
+    # Render port talab qilgani uchun soxta veb-server ochamiz
+    def run_dummy_server():
+        PORT = int(os.environ.get("PORT", 8080))
+        Handler = http.server.SimpleHTTPRequestHandler
+        socketserver.TCPServer.allow_reuse_address = True
+        with socketserver.TCPServer(("", PORT), Handler) as httpd:
+            httpd.serve_forever()
+
+    # Serverni alohida fondagi oqimda yurgizamiz
+    threading.Thread(target=run_dummy_server, daemon=True).start()
+
     print("🚀 Bot muvaffaqiyatli ishga tushdi!")
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
     
+
+
