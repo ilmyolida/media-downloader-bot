@@ -4,6 +4,7 @@ import re
 import time
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.methods.utilities.idle import idle
 from yt_dlp import YoutubeDL
 
 # --- SOZLAMALAR ---
@@ -127,16 +128,21 @@ async def download_and_send_video(message, url):
         if 'filename' in locals() and os.path.exists(filename):
             os.remove(filename)
 
+# --- ASOSIY ISHGA TUSHIRISH QISMI ---
 async def main():
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
-    print("🚀 Bot ishga tushdi!")
+    
+    print("🚀 Bot ishga tushmoqda...")
     await app.start()
-    # Bot serverda to'xtab qolmasligi uchun abadiy sikl
-    while True:
-        await asyncio.sleep(3600)
+    print("✅ Bot Telegramga muvaffaqiyatli ulandi va faol holatda!")
+    
+    # Pyrogram botni xavfsiz va uzluksiz ushlab turuvchi professional metod
+    await idle()
+    
+    await app.stop()
 
 if __name__ == "__main__":
+    # Render muhitidagi asinxron event loop muammosini hal qiluvchi start
     asyncio.run(main())
-
-
+        
