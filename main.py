@@ -127,9 +127,16 @@ async def download_and_send_video(message, url):
         if 'filename' in locals() and os.path.exists(filename):
             os.remove(filename)
 
-if __name__ == "__main__":
+async def main():
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
     print("🚀 Bot ishga tushdi!")
-    app.run()
+    await app.start()
+    # Bot serverda to'xtab qolmasligi uchun abadiy sikl
+    while True:
+        await asyncio.sleep(3600)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
 
