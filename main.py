@@ -12,6 +12,7 @@ YT_CHANNEL_URL = "https://youtube.com/@islamicummah571?si=cdnypvM7njA3knKB"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
 click_timers = {}
+user_links = {}  # Uzun linklarni vaqtinchalik saqlash uchun lug'at
 
 # --- MAJBURIY OBUNA TEKSHIRUVI ---
 def check_subscriptions(user_id):
@@ -39,10 +40,14 @@ def start_handler(message):
     )
 
 # --- TASDIQLASH TUGMASI ISHLOVCHI QISM ---
-@bot.callback_query_handler(func=lambda call: call.data.startswith("verify_"))
+@bot.callback_query_handler(func=lambda call: call.data == "verify_sub")
 def verify_callback(call):
     user_id = call.from_user.id
-    url = call.data.replace("verify_", "")
+    url = user_links.get(str(user_id))
+    
+    if not url:
+        bot.answer_callback_query(call.id, "❌ Havola topilmadi, iltimos linkni qaytadan yuboring!", show_alert=True)
+        return
     
     current_time = time.time()
     start_time = click_timers.get(str(user_id), current_time)
@@ -78,11 +83,12 @@ def link_handler(message):
     
     if not is_tg_sub:
         click_timers[str(user_id)] = time.time()
+        user_links[str(user_id)] = url  # Havolani vaqtinchalik xotiraga olamiz
         
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("1️⃣ Telegramga Obuna Bo'lish", url=f"https://t.me/{TG_CHANNEL}"))
         markup.add(InlineKeyboardButton("2️⃣ YouTube-ga Obuna Bo'lish", url=YT_CHANNEL_URL))
-        markup.add(InlineKeyboardButton("✅ Obunani Tasdiqlash", callback_data=f"verify_{url}"))
+        markup.add(InlineKeyboardButton("✅ Obunani Tasdiqlash", callback_data="verify_sub"))
         
         bot.reply_to(
             message,
@@ -133,13 +139,11 @@ def download_and_send_video(message, url, user_id):
             os.remove(filename)
 
 # --- BOTNI ISHGA TUSHIRISH ---
-# --- BOTNI ISHGA TUSHIRISH ---
 if __name__ == "__main__":
     import threading
     import http.server
     import socketserver
 
-    # Render port talab qilgani uchun soxta veb-server ochamiz
     def run_dummy_server():
         PORT = int(os.environ.get("PORT", 8080))
         Handler = http.server.SimpleHTTPRequestHandler
@@ -147,11 +151,9 @@ if __name__ == "__main__":
         with socketserver.TCPServer(("", PORT), Handler) as httpd:
             httpd.serve_forever()
 
-    # Serverni alohida fondagi oqimda yurgizamiz
     threading.Thread(target=run_dummy_server, daemon=True).start()
 
     print("🚀 Bot muvaffaqiyatli ishga tushdi!")
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
-    
 
 
