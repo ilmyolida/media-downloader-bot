@@ -2,28 +2,43 @@ import os
 import re
 import time
 import asyncio
+import http.server
+import socketserver
+import threading
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from yt_dlp import YoutubeDL
 
 # --- SOZLAMALAR ---
-# --- SOZLAMALAR ---
 API_ID = 33118317
 API_HASH = "53aae636122c27a99a6c211ecc5d0c68"
 BOT_TOKEN = "8846850825:AAFNUneuiSG_EPlvcs1MC5Z7uz1cfphZj-Q"
 
-# Pyrogram Bot Kliyentini yaratish
-app = Client("media_downloader_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client("media_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 user_links = {}
 
+# --- DUMMY SERVER (Render o'chib qolmasligi uchun) ---
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8080))
+    handler = http.server.SimpleHTTPRequestHandler
+    socketserver.TCPServer.allow_reuse_address = True
+    try:
+        with socketserver.TCPServer(("", port), handler) as httpd:
+            httpd.serve_forever()
+    except Exception:
+        pass
+
+threading.Thread(target=run_dummy_server, daemon=True).start()
+
+# --- BOT BUYRUQLARI ---
 @app.on_message(filters.command("start"))
 async def start_cmd(client, message):
     await message.reply_text(
-        "👋 **Xush kelibsiz!**\n\nMen har qanday hajmdagi (hatto 5-6 soatlik, 2 GB gacha) videolarni yuklovchi **Professional Tizimman**.\n\nMenga link yuboring!"
+        "👋 **Xush kelibsiz!**\n\nMen **5-6 soatlik va har qanday hajmdagi** video hamda audiolarni yuklab beruvchi professional botman.\n\nMenga video havolasini yuboring!"
     )
 
-@app.on_message(filters.text & ~filters.command(["start", "lang"]))
+@app.on_message(filters.text & ~filters.command(["start"]))
 async def handle_links(client, message):
     url = message.text.strip()
     
@@ -33,13 +48,12 @@ async def handle_links(client, message):
 
     user_links[message.from_user.id] = url
     
-    # Format tanlash tugmalari
     markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📹 Video (Eng yaxshi sifat)", callback_data="dl_video")],
-        [InlineKeyboardButton("🎵 Audio (MP3 format)", callback_data="dl_audio")]
+        [InlineKeyboardButton("📹 Video (MP4)", callback_data="dl_video")],
+        [InlineKeyboardButton("🎵 Audio (MP3)", callback_data="dl_audio")]
     ])
     
-    await message.reply_text("🎬 **Formatni tanlang:**\nUshbu video har qanday hajda bo'lsa ham professional tizim orqali yuklanadi.", reply_markup=markup)
+    await message.reply_text("🎬 **Formatni tanlang:**", reply_markup=markup)
 
 @app.on_callback_query(filters.regex(r"^dl_"))
 async def download_callback(client, callback_query):
@@ -52,14 +66,13 @@ async def download_callback(client, callback_query):
         return
 
     await callback_query.answer("🔄 Jarayon boshlandi...")
-    status_msg = await callback_query.message.edit_text("🔍 **Video tahlil qilinmoqda va yuklanmoqda...**\nBu o'ta uzun videolar uchun biroz vaqt olishi mumkin.")
+    status_msg = await callback_query.message.edit_text("🔍 **Media yuklanmoqda...**\nUzun videolar uchun biroz vaqt talab etiladi.")
     
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
         
     out_template = f"downloads/{user_id}_{int(time.time())}.%(ext)s"
     
-    # Professional yuklash sozlamalari (Cheklovlarsiz)
     ydl_opts = {
         'outtmpl': out_template,
         'quiet': True,
@@ -73,36 +86,47 @@ async def download_callback(client, callback_query):
         ydl_opts['format'] = 'bestaudio/best'
         ydl_opts['postprocessors'] = [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}]
     else:
-        # 5-6 soatlik videolarni 2GB dan oshirib yubormaslik uchun o'rtacha eng yaxshi sifatni tanlaydi
-        ydl_opts['format'] = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best'
+        ydl_opts['format'] = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best'
 
     filename = None
     try:
-        # Sinxron yuklashni asinxron fonda ishga tushirish
-        loop = asyncio.get_event_loop()
-        with YoutubeDL(ydl_opts) as ydl:
-            info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=True))
-            filename = ydl.prepare_filename(info)
-            if fmt == "audio" and not filename.endswith(".mp3"):
-                filename = os.path.splitext(filename)[0] + ".mp3"
-                
-        await status_msg.edit_text("🚀 **Video serverga yuklab bo'lindi. Endi Telegram'ga yuborilmoqda...**")
+        loop = asyncio.get_running_loop()
+        def extract():
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                return ydl.prepare_filename(info)
+
+        filename = await loop.run_in_executor(None, extract)
         
-        # Pyrogram orqali 2 GB GACHA FAYLLARNI YUKLASH (Katta tezlikda va uzilishlarsiz)
+        if fmt == "audio" and not filename.endswith(".mp3"):
+            filename = os.path.splitext(filename)[0] + ".mp3"
+                
+        await status_msg.edit_text("🚀 **Fayl Telegram'ga yuborilmoqda...**")
+        
         if fmt == "audio":
-            await client.send_audio(chat_id=message.chat.id, audio=filename, caption="✨ @oqivaqotaril loyihasi.")
+            await client.send_audio(chat_id=callback_query.message.chat.id, audio=filename, caption="✨ Muvaffaqiyatli yuklab berildi!")
         else:
-            await client.send_video(chat_id=callback_query.message.chat.id, video=filename, caption="✨ @oqivaqotaril loyihasi.")
+            await client.send_video(chat_id=callback_query.message.chat.id, video=filename, caption="✨ Muvaffaqiyatli yuklab berildi!")
             
         await status_msg.delete()
         
     except Exception as e:
-        await status_msg.edit_text(f"❌ **Xatolik yuz berdi:**\nServer xotirasi to'ldi yoki video hajmi o'ta ulkan.")
+        await status_msg.edit_text(f"❌ **Xatolik:** Video o'ta katta yoki havola bilan muammo bor.")
     finally:
         if filename and os.path.exists(filename):
             os.remove(filename)
 
+# --- XATOLIKLARNI OLDINI OLUVCHI STRATEGIYA ---
+async def main():
+    await app.start()
+    print("🚀 Bot muvaffaqiyatli ishga tushdi!")
+    # Tizim doimiy ishlab turishi uchun blokirovka
+    while True:
+        await asyncio.sleep(3600)
+
 if __name__ == "__main__":
-    print("🚀 Mukammal MTProto Bot Ishga Tushdi!")
-    app.run()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
 
